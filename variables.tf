@@ -26,10 +26,14 @@ variable "worker_count" {
   default     = 2
 }
 
-# locals {
-#   location              = "East US"
-#   vnet_cidr             = "10.0.0.0/8"
-#   subnet_address_prefix = "10.240.0.0/24"
-#   my_ip                 = "101.53.219.90/32"
-#   worker_count          = 3
-# }
+variable "admin_username" {
+  type        = string
+  description = "username for vm root"
+  default     = "kuberoot"
+}
+
+variable "path_to_ssh_pub_key" {
+  type        = string
+  description = "path to admin ssh public key"
+  default     = "~/.ssh/id_rsa.pub"
+}
