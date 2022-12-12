@@ -16,7 +16,7 @@ resource "azurerm_network_security_group" "kubernetes_nsg" {
     direction                  = "Inbound"
     protocol                   = "Tcp"
     source_address_prefix      = "*"
-    source_port_range          = 22
+    source_port_range          = "*"
     priority                   = 1000
   }
 
