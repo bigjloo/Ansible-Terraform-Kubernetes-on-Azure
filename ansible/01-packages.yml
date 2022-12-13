@@ -1,0 +1,113 @@
+---
+- hosts: all
+  become: true
+  remote_user: kuberoot
+
+  tasks:
+    - name: Install lsb-release
+      apt:
+        name: lsb-release
+        state: present
+
+    - name: Install curl
+      apt:
+        name: curl
+        state: present
+
+    - name: Install gnupg
+      apt:
+        name: gnupg
+        state: present
+
+    - name: Install ca-certificates
+      apt:
+        name: ca-certificates
+        state: present
+
+    - name: Install apt-transport-https
+      apt:
+        name: apt-transport-https
+        state: present
+
+    - name: Keyrings directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+
+    - name: Check if Docker GPG key exists
+      stat:
+        path: /etc/apt/keyrings/docker.gpg
+      register: stat_result
+
+    - name: Download Docker GPG
+      shell: |
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      when: not stat_result.stat.exists
+
+    - name: docker.list repository file
+      blockinfile:
+        path: /etc/apt/sources.list.d/docker.list
+        block: |
+          deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu focal stable
+        create: true
+
+    - name: Install containerd
+      apt:
+        name: containerd.io
+        state: present
+        update_cache: yes
+
+    - name: Check k8s.conf exists
+      stat:
+        path: /etc/modules-load.d/k8s.conf
+      register: modules_load_stat_result
+
+    - name: Copy k8s modules conf
+      copy:
+        src: ./files/modules-load-k8s.conf
+        dest: /etc/modules-load.d/k8s.conf
+        owner: root
+        group: root
+        mode: "0744"
+      when: not modules_load_stat_result.stat.exists
+
+    - name: Check sysctl k8s.conf exists
+      stat:
+        path: /etc/sysctl.d/k8s.conf
+      register: sysctl_stat_result
+
+    - name: Copy systemctl k8s modules conf
+      copy:
+        src: ./files/sysctl-k8s.conf
+        dest: /etc/sysctl.d/k8s.conf
+        owner: root
+        group: root
+        mode: "0744"
+      when: not sysctl_stat_result.stat.exists
+
+    - name: Load overlay
+      community.general.modprobe:
+        name: overlay
+        state: present
+
+    - name: Load br_netfilter
+      community.general.modprobe:
+        name: br_netfilter
+        state: present
+
+    - name: Apply sysctl params without reboot
+      shell: |
+        sudo sysctl --system
+
+    # TODO: ensure only run once
+    - name: Delete containerd config file
+      file:
+        path: /etc/containerd/config.toml
+        state: absent
+      register: containerd_config
+
+    - name: Restart containerd service
+      service:
+        name: containerd
+        state: restarted
+      when: containerd_config.changed

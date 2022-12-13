@@ -1,0 +1,47 @@
+---
+- hosts: all
+  become: true
+  remote_user: kuberoot
+
+  tasks:
+    - name: Keyrings directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+
+    - name: Check if Kubernetes GPG key exists
+      stat:
+        path: /etc/apt/keyrings/kubernetes-archive-keyring.gpg
+      register: stat_result
+
+    - name: Download Kubernetes apt GPG
+      shell: |
+        sudo curl -fsSLo /etc/apt/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg
+      when: not stat_result.stat.exists
+
+    - name: kubernetes.list repository file
+      blockinfile:
+        path: /etc/apt/sources.list.d/kubernetes.list
+        block: |
+          deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main
+        create: true
+
+    - name: Install kubeadm, kubelet, kubectl
+      apt:
+        name: "{{ item }}"
+        update_cache: yes
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+
+    - name: Hold kubeadm, kubelet, kubectl
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+# After setting up. Follow instructions from below:
+# https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/
